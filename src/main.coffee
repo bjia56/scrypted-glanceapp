@@ -45,7 +45,7 @@ class GlancePlugin extends ScryptedDeviceBase
         @configEditor = new GlanceConfigEditor 'glance-config-editor', this
         @glanceProcess = null
         @glancePort = null
-        @baseUrl = "/endpoint/@bjia56/scrypted-glance/"
+        @baseUrl = "/endpoint/@bjia56/scrypted-glanceapp/"
         @discoverDevices()
         @startGlanceWhenReady()
 
@@ -144,6 +144,12 @@ class GlancePlugin extends ScryptedDeviceBase
                 }
             ]
             providerNativeId: @nativeId
+        @applicationInfo = {
+            name: 'Glance'
+            description: 'Glance Dashboard App'
+            icon: 'fa-tachometer'
+            href: @baseUrl
+        }
 
     getDevice: (nativeId) ->
         if nativeId == 'glance-config-editor'

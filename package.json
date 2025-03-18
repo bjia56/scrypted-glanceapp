@@ -30,7 +30,9 @@
       "type": "API",
       "interfaces": [
          "DeviceProvider",
-         "HttpRequestHandler"
+         "HttpRequestHandler",
+         "LauncherApplication",
+         "@scrypted/launcher-ignore"
       ]
    },
    "devDependencies": {
