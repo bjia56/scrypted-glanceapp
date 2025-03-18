@@ -20,8 +20,13 @@ class GlanceConfigEditor extends ScryptedDeviceBase
             @initializeConfig resolve, reject
 
     initializeConfig: (resolve, reject) ->
-        while not @storage
-            await new Promise (r) => setTimeout r, 1000
+        while true
+            try
+                @storage.getItem 'glance_config'
+            catch e
+                await new Promise (r) => setTimeout r, 1000
+                continue
+            break
 
         existingConfig = @storage.getItem 'glance_config'
         if existingConfig
