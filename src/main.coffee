@@ -38,11 +38,29 @@ VERSION = glance.version
 DEFAULT_CONFIG_URL = "https://raw.githubusercontent.com/glanceapp/glance/3b79c8e09fc9d3056e978006d7989e0e1f70c6bc/docs/glance.yml"
 
 SERVER_CONFIG = """
-# WARNING: Do not modify this section. It is managed by the plugin.
+# WARNING: Do not modify the server or document section. It is managed by the plugin.
 server:
   port: ${PORT}
   base-url: ${BASE_URL}
+document:
+  head: ${HEAD}
 """
+
+HEAD_SCRIPT = """
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    try {
+        const logo = document.getElementsByClassName('logo')[0];
+        logo.onclick = function() {
+            window.location.href = '/endpoint/@scrypted/core/public/';
+        };
+        logo.style.cursor = 'pointer';
+    } catch (e) {
+        console.error(e);
+    }
+});
+</script>
+""".replace /\n/g, ''
 
 class GlancePlugin extends ScryptedDeviceBase
     constructor: (nativeId) ->
@@ -178,6 +196,7 @@ class GlancePlugin extends ScryptedDeviceBase
         env = Object.assign({}, process.env, {
             PORT: port.toString()
             BASE_URL: @baseUrl
+            HEAD: HEAD_SCRIPT
         })
 
         @console.log "Starting Glance: #{exePath} -config #{@configPath} on port #{port}"
