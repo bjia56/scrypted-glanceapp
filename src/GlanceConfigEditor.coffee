@@ -4,12 +4,11 @@ import path from 'path'
 
 DEFAULT_CONFIG_URL = "https://raw.githubusercontent.com/glanceapp/glance/3b79c8e09fc9d3056e978006d7989e0e1f70c6bc/docs/glance.yml"
 
-SERVER_CONFIG = """\
+SERVER_CONFIG = """
 # WARNING: Do not modify this section. It is managed by the plugin.
 server:
   port: ${PORT}
   base-url: ${BASE_URL}
-
 """
 
 class GlanceConfigEditor extends ScryptedDeviceBase
@@ -21,6 +20,9 @@ class GlanceConfigEditor extends ScryptedDeviceBase
             @initializeConfig resolve, reject
 
     initializeConfig: (resolve, reject) ->
+        while not @storage
+            await new Promise (r) => setTimeout r, 1000
+
         existingConfig = @storage.getItem 'glance_config'
         if existingConfig
             await @writeConfigToDisk existingConfig
@@ -33,7 +35,7 @@ class GlanceConfigEditor extends ScryptedDeviceBase
                     throw new Error "Failed to fetch default config: #{response.statusText}"
 
                 defaultConfig = await response.text()
-                finalConfig = SERVER_CONFIG + defaultConfig
+                finalConfig = SERVER_CONFIG + '\n\n' + defaultConfig
 
                 @storage.setItem 'glance_config', finalConfig
                 await @writeConfigToDisk finalConfig
