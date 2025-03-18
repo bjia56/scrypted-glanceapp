@@ -1,0 +1,51 @@
+name: Autoupdate Glance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 4 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check_new_releases:
+    name: Check for new releases
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check versions
+        run: |
+          CURRENT=$(cat src/glance.json | jq -r .version)
+          LATEST=$(curl -s -S -H "Authorization: Bearer ${{ github.token }}" https://api.github.com/repos/glanceapp/glance/releases | jq -r .[0].tag_name)
+          echo "current=${CURRENT}" >> "$GITHUB_ENV"
+          echo "latest=${LATEST}" >> "$GITHUB_ENV"
+
+      - name: Setup NodeJS
+        if: ${{ env.current != env.latest }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Do update
+        if: ${{ env.current != env.latest }}
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+          sed -i 's/${{ env.current }}/${{ env.latest }}/g' src/glance.json
+          git add src/glance.json
+          git commit -m "Update Glance to ${{ env.latest }}"
+
+          npm i
+          npm version patch
+          npm publish
+
+          git push
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
