@@ -52,7 +52,7 @@ class GlancePlugin extends ScryptedDeviceBase
             .catch reject
         @glanceProcess = null
         @glancePort = null
-        @baseUrl = "/endpoint/@bjia56/scrypted-glanceapp/"
+        @baseUrl = "/endpoint/@bjia56/scrypted-glanceapp/public/"
         @discoverDevices()
         @startGlanceWhenReady()
 
@@ -206,6 +206,20 @@ class GlancePlugin extends ScryptedDeviceBase
             response.send "Glance is not running", { code: 500 }
             return
 
+        unless request.username
+            response.send "",
+                code: 302
+                headers:
+                    'Location': '/endpoint/@scrypted/core/public/'
+            return
+
+        unless request.isPublicEndpoint
+            response.send "",
+                code: 302
+                headers:
+                    'Location': @baseUrl
+            return
+
         # Remove root path from the request URL
         trimmedUrl = request.url.replace(@baseUrl, '')
 
@@ -223,9 +237,13 @@ class GlancePlugin extends ScryptedDeviceBase
             glanceResponse = await fetch glanceUrl, requestOptions
             responseBody = await glanceResponse.text()
 
+            # Remove bad proxy headers
+            headers = new Headers glanceResponse.headers
+            headers.delete 'transfer-encoding'
+
             response.send responseBody,
                 code: glanceResponse.status
-                headers: Object.fromEntries glanceResponse.headers.entries()
+                headers: Object.fromEntries headers
 
         catch error
             @console.error "Error forwarding request to Glance: #{error}"
