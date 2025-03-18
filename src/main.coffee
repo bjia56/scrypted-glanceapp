@@ -12,7 +12,6 @@ import AdmZip from 'adm-zip'
 import * as tar from 'tar'
 
 import glance from './glance.json'
-import GlanceConfigEditor from './GlanceConfigEditor'
 
 DL_ARCH = () ->
     switch arch()
@@ -36,18 +35,80 @@ DL_EXT = () ->
 
 VERSION = glance.version
 
+DEFAULT_CONFIG_URL = "https://raw.githubusercontent.com/glanceapp/glance/3b79c8e09fc9d3056e978006d7989e0e1f70c6bc/docs/glance.yml"
+
+SERVER_CONFIG = """
+# WARNING: Do not modify this section. It is managed by the plugin.
+server:
+  port: ${PORT}
+  base-url: ${BASE_URL}
+"""
+
 class GlancePlugin extends ScryptedDeviceBase
     constructor: (nativeId) ->
         super nativeId
         @exe = new Promise (resolve, reject) =>
             @doDownload resolve
             .catch reject
-        @configEditor = new GlanceConfigEditor 'glance-config-editor', this
         @glanceProcess = null
         @glancePort = null
         @baseUrl = "/endpoint/@bjia56/scrypted-glanceapp/"
         @discoverDevices()
         @startGlanceWhenReady()
+
+        @configPath = path.join process.env.SCRYPTED_PLUGIN_VOLUME, 'glance.yml'
+        @configReady = new Promise (resolve, reject) =>
+            @initializeConfig resolve, reject
+
+    initializeConfig: (resolve, reject) ->
+        while true
+            try
+                @storage.getItem 'glance_config'
+            catch e
+                await new Promise (r) => setTimeout r, 1000
+                continue
+            break
+
+        existingConfig = @storage.getItem 'glance_config'
+        if existingConfig
+            await @writeConfigToDisk existingConfig
+            resolve()
+        else
+            try
+                @console.log "Fetching default glance configuration..."
+                response = await fetch DEFAULT_CONFIG_URL
+                unless response.ok
+                    throw new Error "Failed to fetch default config: #{response.statusText}"
+
+                defaultConfig = await response.text()
+                finalConfig = SERVER_CONFIG + '\n\n' + defaultConfig
+
+                @storage.setItem 'glance_config', finalConfig
+                await @writeConfigToDisk finalConfig
+                resolve()
+            catch e
+                reject e
+
+    writeConfigToDisk: (config) ->
+        await writeFile @configPath, config
+        @console.log "Glance configuration updated at #{@configPath}"
+
+    saveScript: (script) ->
+        return unless script.script?
+        @storage.setItem 'glance_config', script.script
+        await @writeConfigToDisk script.script
+
+    loadScripts: ->
+        config = @storage.getItem 'glance_config' || ''
+        return {
+            'glance.yml':
+                name: 'glance.yml'
+                script: config
+                language: 'yaml'
+        }
+
+    eval: (source, variables = {}) ->
+        throw new Error "Evaluation is not supported for glance configuration."
 
     doDownload: (resolve) ->
         url = "https://github.com/glanceapp/glance/releases/download/#{VERSION}/glance-#{DL_PLATFORM()}-#{DL_ARCH()}.#{DL_EXT()}"
@@ -105,14 +166,13 @@ class GlancePlugin extends ScryptedDeviceBase
             server.on 'error', reject
 
     startGlanceWhenReady: ->
-        Promise.all([@exe, @configEditor.configReady, @findFreePort()]).then ([exePath, _, port]) =>
+        Promise.all([@exe, @configReady, @findFreePort()]).then ([exePath, _, port]) =>
             @glancePort = port
             @startGlance exePath, port
 
     startGlance: (exePath, port) ->
-        configPath = @configEditor.configPath
-        unless existsSync configPath
-            @console.error "Glance config file is missing: #{configPath}"
+        unless existsSync @configPath
+            @console.error "Glance config file is missing: #{@configPath}"
             return
 
         env = Object.assign({}, process.env, {
@@ -120,8 +180,8 @@ class GlancePlugin extends ScryptedDeviceBase
             BASE_URL: @baseUrl
         })
 
-        @console.log "Starting Glance: #{exePath} -config #{configPath} on port #{port}"
-        @glanceProcess = spawn exePath, ['-config', configPath], { env }
+        @console.log "Starting Glance: #{exePath} -config #{@configPath} on port #{port}"
+        @glanceProcess = spawn exePath, ['-config', @configPath], { env }
 
         @glanceProcess.stdout.on 'data', (data) =>
             process.stdout.write "[Glance] #{data}"
@@ -134,27 +194,12 @@ class GlancePlugin extends ScryptedDeviceBase
             setTimeout (=> @startGlanceWhenReady()), 20000  # Restart after 20s
 
     discoverDevices: ->
-        sdk.deviceManager.onDevicesChanged
-            devices: [
-                {
-                    nativeId: 'glance-config-editor'
-                    name: 'Glance Configuration Editor'
-                    type: ScryptedDeviceType.API
-                    interfaces: [ScryptedInterface.Scriptable]
-                }
-            ]
-            providerNativeId: @nativeId
         @applicationInfo = {
             name: 'Glance'
             description: 'Glance Dashboard App'
             icon: 'fa-tachometer'
             href: @baseUrl
         }
-
-    getDevice: (nativeId) ->
-        if nativeId == 'glance-config-editor'
-            return @configEditor
-        return null
 
     onRequest: (request, response) ->
         unless @glancePort

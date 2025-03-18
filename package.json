@@ -29,7 +29,7 @@
       "name": "Glance",
       "type": "API",
       "interfaces": [
-         "DeviceProvider",
+         "Scriptable",
          "HttpRequestHandler",
          "LauncherApplication",
          "@scrypted/launcher-ignore"
