@@ -1,6 +1,6 @@
 {
    "name": "@bjia56/scrypted-glanceapp",
-   "version": "0.0.9",
+   "version": "0.0.10",
    "description": "Glance dashboard for Scrypted",
    "license": "AGPL-3.0",
    "keywords": [
